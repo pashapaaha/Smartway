@@ -76,7 +76,7 @@ func main() {
 }
 
 func Init() {
-	db.Exec(startQuery)
+	_, _ = db.Exec(startQuery)
 	employee1 := Employee{
 		Id:        1,
 		Name:      "John",
@@ -145,10 +145,10 @@ func getEmployeesByCompanyHandler(writer http.ResponseWriter, request *http.Requ
 
 	employeesOfCompany := make([]Employee, 0)
 	rows, err := db.Query("select e.id, e.name, e.surname, e.phone, e.company_id, p.type, p.number from employees e inner join passport p on e.passport_id = p.id where e.company_id = $1;", companyId)
-	if err != nil {
-
-	}
 	defer rows.Close()
+	if err != nil {
+		return
+	}
 	for rows.Next() {
 		empl := Employee{
 			Passport: Passport{},
@@ -229,13 +229,8 @@ func deleteEmployeeHandler(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	_, _ = db.Exec("DELETE FROM employees WHERE id = $1;", id)
 
-	for index, temp := range employees {
-		if temp.Id == id {
-			employees = append(employees[:index], employees[index+1:]...)
-			return
-		}
-	}
 }
 
 func getIdFromURL(url string) (int, error) {
