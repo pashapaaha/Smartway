@@ -11,43 +11,7 @@ import (
 	"time"
 )
 
-type Employee struct {
-	Id        int
-	Name      string
-	Surname   string
-	Phone     string
-	CompanyId int
-	Passport  Passport
-}
-
-type Passport struct {
-	Type   string
-	Number string
-}
-
-const (
-	path  = "/employee/"
-	dbUrl = "host=localhost user=postgres password=12345 dbname=employeesDB sslmode=disable"
-)
-
-var startQuery = `
-CREATE TABLE IF NOT EXISTS passport
-(
-    id   BIGINT PRIMARY KEY,
-    type varchar(255),
-    number varchar(255)
-);
-
-CREATE TABLE IF NOT EXISTS employees
-(
-    id   BIGINT PRIMARY KEY,
-    name VARCHAR(255),
-    surname VARCHAR(255),
-    phone VARCHAR(255),
-    company_id BIGINT,
-    passport_id BIGINT,
-    FOREIGN KEY (passport_id) REFERENCES passport(id)
-);`
+const path = "/employee/"
 
 var employees = make([]Employee, 0)
 var db *sql.DB
