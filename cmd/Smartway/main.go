@@ -32,13 +32,14 @@ const (
 )
 
 var startQuery = `
+CREATE SEQUENCE IF NOT EXISTS employees_seq;
+CREATE SEQUENCE IF NOT EXISTS passport_seq;
 CREATE TABLE IF NOT EXISTS passport
 (
     id   BIGINT PRIMARY KEY,
     type varchar(255),
     number varchar(255)
 );
-
 CREATE TABLE IF NOT EXISTS employees
 (
     id   BIGINT PRIMARY KEY,
