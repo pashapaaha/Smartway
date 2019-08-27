@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	_ "github.com/lib/pq"
 	"log"
 	"net/http"
 	"strconv"
@@ -23,11 +25,40 @@ type Passport struct {
 	Number string
 }
 
-const path = "/employee/"
+const (
+	path  = "/employee/"
+	dbUrl = "host=localhost user=postgres password=12345 dbname=employeesDB sslmode=disable"
+)
+
+var startQuery = `
+CREATE TABLE IF NOT EXISTS passport
+(
+    id   BIGINT PRIMARY KEY,
+    type varchar(255),
+    number varchar(255)
+);
+
+CREATE TABLE IF NOT EXISTS employees
+(
+    id   BIGINT PRIMARY KEY,
+    name VARCHAR(255),
+    surname VARCHAR(255),
+    phone VARCHAR(255),
+    company_id BIGINT,
+    passport_id BIGINT,
+    FOREIGN KEY (passport_id) REFERENCES passport(id)
+);`
 
 var employees = make([]Employee, 0)
+var db *sql.DB
 
 func main() {
+	var err error
+	db, err = sql.Open("postgres", dbUrl)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	Init()
 	handler := CreateHandler()
 
@@ -45,6 +76,7 @@ func main() {
 }
 
 func Init() {
+	db.Exec(startQuery)
 	employee1 := Employee{
 		Id:        1,
 		Name:      "John",
@@ -110,12 +142,24 @@ func getEmployeesByCompanyHandler(writer http.ResponseWriter, request *http.Requ
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
 	employeesOfCompany := make([]Employee, 0)
-	for _, empl := range employees {
-		if empl.CompanyId == companyId {
-			employeesOfCompany = append(employeesOfCompany, empl)
-		}
+	rows, err := db.Query("select e.id, e.name, e.surname, e.phone, e.company_id, p.type, p.number from employees e inner join passport p on e.passport_id = p.id where e.company_id = $1;", companyId)
+	if err != nil {
+
 	}
+	defer rows.Close()
+	for rows.Next() {
+		empl := Employee{
+			Passport: Passport{},
+		}
+		err = rows.Scan(&empl.Id, &empl.Name, &empl.Surname, &empl.Phone, &empl.CompanyId, &empl.Passport.Type, &empl.Passport.Number)
+		if err != nil {
+			continue
+		}
+		employeesOfCompany = append(employeesOfCompany, empl)
+	}
+
 	employeesJSON, err1 := json.Marshal(employeesOfCompany)
 	if err1 != nil {
 		writer.WriteHeader(http.StatusBadRequest)
