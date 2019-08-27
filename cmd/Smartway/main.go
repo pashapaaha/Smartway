@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	_ "github.com/lib/pq"
 	"log"
 	"net/http"
@@ -11,7 +12,43 @@ import (
 	"time"
 )
 
-const path = "/employee/"
+type Employee struct {
+	Id        int
+	Name      string
+	Surname   string
+	Phone     string
+	CompanyId int
+	Passport  Passport
+}
+
+type Passport struct {
+	Type   string
+	Number string
+}
+
+const (
+	path  = "/employee/"
+	dbUrl = "host=localhost user=postgres password=12345 dbname=employeesDB sslmode=disable"
+)
+
+var startQuery = `
+CREATE TABLE IF NOT EXISTS passport
+(
+    id   BIGINT PRIMARY KEY,
+    type varchar(255),
+    number varchar(255)
+);
+
+CREATE TABLE IF NOT EXISTS employees
+(
+    id   BIGINT PRIMARY KEY,
+    name VARCHAR(255),
+    surname VARCHAR(255),
+    phone VARCHAR(255),
+    company_id BIGINT,
+    passport_id BIGINT,
+    FOREIGN KEY (passport_id) REFERENCES passport(id)
+);`
 
 var employees = make([]Employee, 0)
 var db *sql.DB
@@ -24,7 +61,8 @@ func main() {
 	}
 
 	Init()
-	handler := CreateHandler()
+	handler := http.NewServeMux()
+	handler.HandleFunc(path, handleFunc)
 
 	server := http.Server{
 		Addr:              ":8080",
@@ -75,12 +113,6 @@ func Init() {
 		},
 	}
 	employees = append(employees, employee1, employee2, employee3)
-}
-
-func CreateHandler() (handler *http.ServeMux) {
-	handler = http.NewServeMux()
-	handler.HandleFunc(path, handleFunc)
-	return
 }
 
 func handleFunc(writer http.ResponseWriter, request *http.Request) {
@@ -140,23 +172,15 @@ func addEmployeeHandler(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	newId := maxEmployeeId() + 1
-	employee.Id = newId
-	employees = append(employees, employee)
+	var passportId, employeeId int
+	_ = db.QueryRow("INSERT INTO passport (type, number) VALUES ($1, $2) returning id;", employee.Passport.Type, employee.Passport.Number).Scan(&passportId)
+	_ = db.QueryRow("INSERT INTO employees (name, surname, phone, company_id, passport_id) VALUES ($1, $2, $3, $4, $5) returning id;",
+		employee.Name, employee.Surname, employee.Phone, employee.CompanyId, passportId).Scan(&employeeId)
+
 	writer.WriteHeader(http.StatusOK)
-	outPut, _ := json.Marshal(newId)
+	outPut, _ := json.Marshal(fmt.Sprintf("Id of new employee is %d", employeeId))
 	_, _ = writer.Write(outPut)
 
-}
-
-func maxEmployeeId() int {
-	max := employees[0].Id
-	for _, empl := range employees {
-		if empl.Id > max {
-			max = empl.Id
-		}
-	}
-	return max
 }
 
 func updateEmployeeHandler(writer http.ResponseWriter, request *http.Request) {
