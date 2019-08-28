@@ -53,7 +53,7 @@ func handleFunc(writer http.ResponseWriter, request *http.Request) {
 	case http.MethodDelete:
 		deleteEmployeeListener(writer, request)
 	default:
-
+		methodIsNotAllowedListener(writer, request)
 	}
 }
 
@@ -120,7 +120,7 @@ func addEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 		passportId).Scan(&employeeId)
 
 	writer.WriteHeader(http.StatusOK)
-	outPut, _ := json.Marshal(fmt.Sprintf("Id of new employee is %d", employeeId))
+	outPut, _ := json.Marshal(fmt.Sprintf("Success! Id of new employee is %d", employeeId))
 	_, _ = writer.Write(outPut)
 
 }
@@ -169,6 +169,8 @@ func updateEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	writer.WriteHeader(http.StatusOK)
+	output, _ := json.Marshal("Success!")
+	_, _ = writer.Write(output)
 }
 
 func deleteEmployeeListener(writer http.ResponseWriter, request *http.Request) {
@@ -177,11 +179,23 @@ func deleteEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	_, _ = db.Exec("DELETE FROM employees WHERE id = $1;", id)
-
+	_, err = db.Exec("DELETE FROM employees WHERE id = $1;", id)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	writer.WriteHeader(http.StatusOK)
+	output, _ := json.Marshal("Success!")
+	_, _ = writer.Write(output)
 }
 
 func getIdFromURL(url string) (int, error) {
 	param := strings.Replace(url, path, "", 1)
 	return strconv.Atoi(param)
+}
+
+func methodIsNotAllowedListener(writer http.ResponseWriter, request *http.Request) {
+	writer.WriteHeader(http.StatusBadRequest)
+	msg, _ := json.Marshal(fmt.Sprintf("Method %s not allowed", request.Method))
+	_, _ = writer.Write(msg)
 }

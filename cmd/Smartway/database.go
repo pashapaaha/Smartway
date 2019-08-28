@@ -7,17 +7,17 @@ CREATE SEQUENCE IF NOT EXISTS employees_seq;
 CREATE SEQUENCE IF NOT EXISTS passport_seq;
 CREATE TABLE IF NOT EXISTS passport
 (
-    id   BIGINT PRIMARY KEY,
-    type varchar(255),
-    number varchar(255)
+    id     BIGINT PRIMARY KEY DEFAULT nextval('passport_seq'),
+    type   VARCHAR(255),
+    number VARCHAR(255)
 );
 CREATE TABLE IF NOT EXISTS employees
 (
-    id   BIGINT PRIMARY KEY,
-    name VARCHAR(255),
-    surname VARCHAR(255),
-    phone VARCHAR(255),
-    company_id BIGINT,
+    id          BIGINT PRIMARY KEY DEFAULT nextval('employees_seq'),
+    name        VARCHAR(255),
+    surname     VARCHAR(255),
+    phone       VARCHAR(255),
+    company_id  BIGINT,
     passport_id BIGINT,
-    FOREIGN KEY (passport_id) REFERENCES passport(id)
+    FOREIGN KEY (passport_id) REFERENCES passport (id)
 );`
