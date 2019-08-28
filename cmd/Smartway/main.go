@@ -86,6 +86,10 @@ func getEmployeesByCompanyListener(writer http.ResponseWriter, request *http.Req
 		}
 		employeesOfCompany = append(employeesOfCompany, empl)
 	}
+	if len(employeesOfCompany) == 0 {
+		writer.WriteHeader(http.StatusNotFound)
+		return
+	}
 
 	employeesJSON, err1 := json.Marshal(employeesOfCompany)
 	if err1 != nil {
