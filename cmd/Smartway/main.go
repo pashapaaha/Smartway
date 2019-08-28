@@ -127,19 +127,30 @@ func updateEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	var employee Employee
-	err = json.NewDecoder(request.Body).Decode(&employee)
-	if err != nil {
-		writer.WriteHeader(http.StatusBadRequest)
-		return
-	}
 	var count int
 	_ = db.QueryRow("SELECT COUNT(*) FROM employees WHERE id = $1", id).Scan(&count)
 	if count == 0 {
 		writer.WriteHeader(http.StatusNotFound)
 		return
 	}
-	// TODO: реализовать изменение структуры passport
+	var employee Employee
+	err = json.NewDecoder(request.Body).Decode(&employee)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if employee.Passport.Number != "" || employee.Passport.Type != "" {
+		var passId int
+		_ = db.QueryRow("SELECT passport_id FROM employees WHERE id = $1 LIMIT 1", id).Scan(&passId)
+		if employee.Passport.Number != "" {
+			_, _ = db.Exec("UPDATE passport SET number=$1 WHERE id = $2", employee.Passport.Number, passId)
+		}
+		if employee.Passport.Type != "" {
+			_, _ = db.Exec("UPDATE passport SET type=$1 WHERE id = $2", employee.Passport.Type, passId)
+		}
+	}
+
 	if employee.Name != "" {
 		_, _ = db.Exec("UPDATE employees SET name=$1 WHERE id = $2", employee.Name, id)
 	}
