@@ -40,6 +40,7 @@ func main() {
 
 }
 
+//обработка запроса с параметром "/employee/"
 func handleFunc(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 
@@ -57,6 +58,7 @@ func handleFunc(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
+//Обработка метода GET
 func getEmployeesByCompanyListener(writer http.ResponseWriter, request *http.Request) {
 	companyId, err := getIdFromURL(request.URL.Path)
 	if err != nil {
@@ -100,6 +102,7 @@ func getEmployeesByCompanyListener(writer http.ResponseWriter, request *http.Req
 	}
 }
 
+//Обработка метода POST
 func addEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 	var employee Employee
 	err := json.NewDecoder(request.Body).Decode(&employee)
@@ -125,6 +128,7 @@ func addEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 
 }
 
+//Обработка метода PUT
 func updateEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 	id, err := getIdFromURL(request.URL.Path)
 	if err != nil {
@@ -173,6 +177,7 @@ func updateEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 	_, _ = writer.Write(output)
 }
 
+//Обработка метода DELETE
 func deleteEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 	id, err := getIdFromURL(request.URL.Path)
 	if err != nil {
@@ -189,11 +194,13 @@ func deleteEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 	_, _ = writer.Write(output)
 }
 
+//Метод получаения id из запроса пользователя
 func getIdFromURL(url string) (int, error) {
 	param := strings.Replace(url, path, "", 1)
 	return strconv.Atoi(param)
 }
 
+//Обработка неподдерживаемых методов
 func methodIsNotAllowedListener(writer http.ResponseWriter, request *http.Request) {
 	writer.WriteHeader(http.StatusBadRequest)
 	msg, _ := json.Marshal(fmt.Sprintf("Method %s not allowed", request.Method))
