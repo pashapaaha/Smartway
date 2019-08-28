@@ -12,46 +12,8 @@ import (
 	"time"
 )
 
-type Employee struct {
-	Id        int
-	Name      string
-	Surname   string
-	Phone     string
-	CompanyId int
-	Passport  Passport
-}
+const path = "/employee/"
 
-type Passport struct {
-	Type   string
-	Number string
-}
-
-const (
-	path  = "/employee/"
-	dbUrl = "host=localhost user=postgres password=12345 dbname=employeesDB sslmode=disable"
-)
-
-var startQuery = `
-CREATE SEQUENCE IF NOT EXISTS employees_seq;
-CREATE SEQUENCE IF NOT EXISTS passport_seq;
-CREATE TABLE IF NOT EXISTS passport
-(
-    id   BIGINT PRIMARY KEY,
-    type varchar(255),
-    number varchar(255)
-);
-CREATE TABLE IF NOT EXISTS employees
-(
-    id   BIGINT PRIMARY KEY,
-    name VARCHAR(255),
-    surname VARCHAR(255),
-    phone VARCHAR(255),
-    company_id BIGINT,
-    passport_id BIGINT,
-    FOREIGN KEY (passport_id) REFERENCES passport(id)
-);`
-
-var employees = make([]Employee, 0)
 var db *sql.DB
 
 func main() {
@@ -61,7 +23,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	Init()
+	_, _ = db.Exec(startQuery)
 	handler := http.NewServeMux()
 	handler.HandleFunc(path, handleFunc)
 
@@ -78,62 +40,24 @@ func main() {
 
 }
 
-func Init() {
-	_, _ = db.Exec(startQuery)
-	employee1 := Employee{
-		Id:        1,
-		Name:      "John",
-		Surname:   "Crammer",
-		Phone:     "555-01-00",
-		CompanyId: 1,
-		Passport: Passport{
-			Type:   "USA-passport",
-			Number: "12",
-		},
-	}
-	employee2 := Employee{
-		Id:        2,
-		Name:      "Ivan",
-		Surname:   "Ivanov",
-		Phone:     "01010101",
-		CompanyId: 2,
-		Passport: Passport{
-			Type:   "USA-passport",
-			Number: "12",
-		},
-	}
-	employee3 := Employee{
-		Id:        3,
-		Name:      "Petr",
-		Surname:   "Petrov",
-		Phone:     "1111111",
-		CompanyId: 2,
-		Passport: Passport{
-			Type:   "USA-passport",
-			Number: "12",
-		},
-	}
-	employees = append(employees, employee1, employee2, employee3)
-}
-
 func handleFunc(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 
 	switch request.Method {
 	case http.MethodGet:
-		getEmployeesByCompanyHandler(writer, request)
+		getEmployeesByCompanyListener(writer, request)
 	case http.MethodPost:
-		addEmployeeHandler(writer, request)
+		addEmployeeListener(writer, request)
 	case http.MethodPut:
-		updateEmployeeHandler(writer, request)
+		updateEmployeeListener(writer, request)
 	case http.MethodDelete:
-		deleteEmployeeHandler(writer, request)
+		deleteEmployeeListener(writer, request)
 	default:
 
 	}
 }
 
-func getEmployeesByCompanyHandler(writer http.ResponseWriter, request *http.Request) {
+func getEmployeesByCompanyListener(writer http.ResponseWriter, request *http.Request) {
 	companyId, err := getIdFromURL(request.URL.Path)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -150,7 +74,13 @@ func getEmployeesByCompanyHandler(writer http.ResponseWriter, request *http.Requ
 		empl := Employee{
 			Passport: Passport{},
 		}
-		err = rows.Scan(&empl.Id, &empl.Name, &empl.Surname, &empl.Phone, &empl.CompanyId, &empl.Passport.Type, &empl.Passport.Number)
+		err = rows.Scan(&empl.Id,
+			&empl.Name,
+			&empl.Surname,
+			&empl.Phone,
+			&empl.CompanyId,
+			&empl.Passport.Type,
+			&empl.Passport.Number)
 		if err != nil {
 			continue
 		}
@@ -166,7 +96,7 @@ func getEmployeesByCompanyHandler(writer http.ResponseWriter, request *http.Requ
 	}
 }
 
-func addEmployeeHandler(writer http.ResponseWriter, request *http.Request) {
+func addEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 	var employee Employee
 	err := json.NewDecoder(request.Body).Decode(&employee)
 	if err != nil {
@@ -174,9 +104,16 @@ func addEmployeeHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	var passportId, employeeId int
-	_ = db.QueryRow("INSERT INTO passport (type, number) VALUES ($1, $2) returning id;", employee.Passport.Type, employee.Passport.Number).Scan(&passportId)
+	_ = db.QueryRow("INSERT INTO passport (type, number) VALUES ($1, $2) returning id;",
+		employee.Passport.Type,
+		employee.Passport.Number).Scan(&passportId)
+
 	_ = db.QueryRow("INSERT INTO employees (name, surname, phone, company_id, passport_id) VALUES ($1, $2, $3, $4, $5) returning id;",
-		employee.Name, employee.Surname, employee.Phone, employee.CompanyId, passportId).Scan(&employeeId)
+		employee.Name,
+		employee.Surname,
+		employee.Phone,
+		employee.CompanyId,
+		passportId).Scan(&employeeId)
 
 	writer.WriteHeader(http.StatusOK)
 	outPut, _ := json.Marshal(fmt.Sprintf("Id of new employee is %d", employeeId))
@@ -184,7 +121,7 @@ func addEmployeeHandler(writer http.ResponseWriter, request *http.Request) {
 
 }
 
-func updateEmployeeHandler(writer http.ResponseWriter, request *http.Request) {
+func updateEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 	id, err := getIdFromURL(request.URL.Path)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -196,23 +133,30 @@ func updateEmployeeHandler(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	var idIsFound = false
-	for index, temp := range employees {
-		if temp.Id == id {
-			employees[index] = employee
-			employees[index].Id = id
-			idIsFound = true
-			return
-		}
-	}
-	if !idIsFound {
+	var count int
+	_ = db.QueryRow("SELECT COUNT(*) FROM employees WHERE id = $1", id).Scan(&count)
+	if count == 0 {
 		writer.WriteHeader(http.StatusNotFound)
-	} else {
-		writer.WriteHeader(http.StatusOK)
+		return
 	}
+	// TODO: реализовать изменение структуры passport
+	if employee.Name != "" {
+		_, _ = db.Exec("UPDATE employees SET name=$1 WHERE id = $2", employee.Name, id)
+	}
+	if employee.Surname != "" {
+		_, _ = db.Exec("UPDATE employees SET surname=$1 WHERE id = $2", employee.Surname, id)
+	}
+	if employee.Phone != "" {
+		_, _ = db.Exec("UPDATE employees SET phone=$1 WHERE id = $2", employee.Phone, id)
+	}
+	if employee.CompanyId != 0 {
+		_, _ = db.Exec("UPDATE employees SET company_id=$1 WHERE id = $2", employee.CompanyId, id)
+	}
+
+	writer.WriteHeader(http.StatusOK)
 }
 
-func deleteEmployeeHandler(writer http.ResponseWriter, request *http.Request) {
+func deleteEmployeeListener(writer http.ResponseWriter, request *http.Request) {
 	id, err := getIdFromURL(request.URL.Path)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
